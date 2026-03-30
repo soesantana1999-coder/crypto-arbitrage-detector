@@ -21,6 +21,10 @@ Kraken  ──┼── ccxt ── Spread Calculator ── FastAPI ── WebS
 KuCoin  ──┘
 ```
 
+## Live Demo
+
+**https://crypto-arbitrage-detector.onrender.com**
+
 ## Quick Start
 
 ```bash
