@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Santana Brain — Dashboard Unificado</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Courier New', monospace; background: #0a0a0a; color: #e0e0e0; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; height: 100vh; }
+        .panel { background: #0d0d0d; overflow: hidden; position: relative; }
+        .panel-header {
+            background: #111;
+            padding: 8px 15px;
+            font-size: 13px;
+            font-weight: bold;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-header .title { color: #00ff88; }
+        .panel-header .status { font-size: 11px; }
+        .status-on { color: #00ff88; }
+        .status-off { color: #ff4444; }
+        iframe { width: 100%; height: calc(100% - 35px); border: none; }
+        .panel-full { grid-column: 1 / -1; }
+        @media (max-width: 1200px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid">
+        <div class="panel">
+            <div class="panel-header">
+                <span class="title">ARBITRAJE — Binance + Kraken + KuCoin</span>
+                <span class="status" id="arb-status">Checking...</span>
+            </div>
+            <iframe src="http://localhost:8080" id="arb-frame"></iframe>
+        </div>
+        <div class="panel">
+            <div class="panel-header">
+                <span class="title">TRADING — FreqUI</span>
+                <span class="status" id="trade-status">Checking...</span>
+            </div>
+            <iframe src="http://localhost:8081" id="trade-frame"></iframe>
+        </div>
+    </div>
+    <script>
+        async function checkStatus(url, elementId) {
+            try {
+                const resp = await fetch(url, {signal: AbortSignal.timeout(3000)});
+                if (resp.ok) {
+                    document.getElementById(elementId).innerHTML = '<span class="status-on">LIVE</span>';
+                } else {
+                    document.getElementById(elementId).innerHTML = '<span class="status-off">ERROR</span>';
+                }
+            } catch {
+                document.getElementById(elementId).innerHTML = '<span class="status-off">OFFLINE</span>';
+            }
+        }
+        setInterval(() => {
+            checkStatus('http://localhost:8080/api/prices', 'arb-status');
+            checkStatus('http://localhost:8081/api/v1/ping', 'trade-status');
+        }, 10000);
+        checkStatus('http://localhost:8080/api/prices', 'arb-status');
+        checkStatus('http://localhost:8081/api/v1/ping', 'trade-status');
+    </script>
+</body>
+</html>

@@ -45,30 +45,30 @@ stats = {"total_scans": 0, "total_opportunities": 0, "start_time": time.time()}
 async def fetch_prices():
     """Fetch precios de los 3 exchanges continuamente."""
     while True:
-        for pair in PAIRS:
-            for name, exchange in EXCHANGES.items():
-                try:
-                    ticker = await exchange.fetch_ticker(pair)
-                    if pair not in prices:
-                        prices[pair] = {}
-                    prices[pair][name] = {
-                        "bid": ticker.get("bid", 0) or 0,
-                        "ask": ticker.get("ask", 0) or 0,
-                        "last": ticker.get("last", 0) or 0,
-                        "timestamp": time.time(),
-                    }
-                except Exception:
-                    pass  # Exchange puede no tener el par
+        try:
+            for pair in PAIRS:
+                for name, exchange in EXCHANGES.items():
+                    try:
+                        ticker = await asyncio.wait_for(
+                            exchange.fetch_ticker(pair), timeout=10
+                        )
+                        if pair not in prices:
+                            prices[pair] = {}
+                        prices[pair][name] = {
+                            "bid": ticker.get("bid", 0) or 0,
+                            "ask": ticker.get("ask", 0) or 0,
+                            "last": ticker.get("last", 0) or 0,
+                            "timestamp": time.time(),
+                        }
+                    except (asyncio.TimeoutError, Exception):
+                        pass
 
-            # Detectar arbitraje para este par
-            detect_arbitrage(pair)
-            stats["total_scans"] += 1
+                detect_arbitrage(pair)
+                stats["total_scans"] += 1
 
-        # Broadcast a clientes WebSocket
-        await broadcast_state()
-
-        # Rate limit: esperar 2 segundos entre ciclos completos
-        await asyncio.sleep(2)
+            await asyncio.sleep(3)
+        except Exception:
+            await asyncio.sleep(5)
 
 
 def detect_arbitrage(pair: str):
@@ -133,46 +133,25 @@ def detect_arbitrage(pair: str):
 
 
 async def broadcast_state():
-    """Envía estado actual a todos los clientes WebSocket."""
-    if not connected_clients:
-        return
-
-    # Top oportunidades actuales
-    current_opps = sorted(
-        [o for o in opportunities if time.time() - datetime.fromisoformat(o["timestamp"]).timestamp() < 60],
-        key=lambda x: x["spread_pct"],
-        reverse=True,
-    )[:20]
-
-    state = {
-        "prices": prices,
-        "opportunities": current_opps,
-        "stats": {
-            **stats,
-            "uptime_minutes": round((time.time() - stats["start_time"]) / 60, 1),
-            "active_pairs": len(prices),
-            "active_exchanges": len(EXCHANGES),
-        },
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-    message = json.dumps(state, default=str)
-    disconnected = set()
-    for client in connected_clients:
-        try:
-            await client.send_text(message)
-        except Exception:
-            disconnected.add(client)
-    connected_clients -= disconnected
+    """No-op — cada WebSocket envía datos directamente."""
+    pass
 
 
 # --- API Routes ---
 @app.get("/", response_class=HTMLResponse)
-async def dashboard():
+async def arbitrage_page():
     html_path = Path(__file__).parent / "static" / "index.html"
     if html_path.exists():
         return html_path.read_text()
     return "<h1>Crypto Arbitrage Detector</h1><p>Dashboard loading...</p>"
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def unified_dashboard():
+    html_path = Path(__file__).parent / "static" / "dashboard.html"
+    if html_path.exists():
+        return html_path.read_text()
+    return "<h1>Dashboard</h1>"
 
 
 @app.websocket("/ws")
