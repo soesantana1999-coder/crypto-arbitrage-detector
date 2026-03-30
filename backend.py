@@ -181,8 +181,29 @@ async def websocket_endpoint(websocket: WebSocket):
     connected_clients.add(websocket)
     try:
         while True:
-            await websocket.receive_text()  # Keep alive
+            # Enviar estado cada 3 segundos al cliente
+            current_opps = sorted(
+                [o for o in opportunities],
+                key=lambda x: x["spread_pct"],
+                reverse=True,
+            )[:20]
+
+            state = {
+                "prices": prices,
+                "opportunities": current_opps,
+                "stats": {
+                    **stats,
+                    "uptime_minutes": round((time.time() - stats["start_time"]) / 60, 1),
+                    "active_pairs": len(prices),
+                    "active_exchanges": len(EXCHANGES),
+                },
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            await websocket.send_json(state)
+            await asyncio.sleep(3)
     except WebSocketDisconnect:
+        connected_clients.discard(websocket)
+    except Exception:
         connected_clients.discard(websocket)
 
 
